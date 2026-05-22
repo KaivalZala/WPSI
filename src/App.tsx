@@ -52,10 +52,10 @@ export default function App() {
 
   // Save to local storage whenever important state changes
   useEffect(() => {
-    localStorage.setItem('currentDay', currentDay);
+    localStorage.setItem('currentDay', String(currentDay));
     localStorage.setItem('dailyProgress', JSON.stringify(dailyProgress));
     localStorage.setItem('mistakes', JSON.stringify(mistakes));
-    localStorage.setItem('focusBlocksCompleted', focusBlocksCompleted);
+    localStorage.setItem('focusBlocksCompleted',String(focusBlocksCompleted));
   }, [currentDay, dailyProgress, mistakes, focusBlocksCompleted]);
 
   // Timer countdown logic
@@ -122,9 +122,12 @@ export default function App() {
 
   const calculateTotalMCQs = () => {
     let total = 0;
-    Object.values(dailyProgress).forEach(day => {
-      total += (day.tech || 0) + (day.math || 0) + (day.reason || 0);
-    });
+Object.values(dailyProgress as any).forEach((day: any) => {
+  total +=
+    (day.tech || 0) +
+    (day.math || 0) +
+    (day.reason || 0);
+});
     return total;
   };
 
@@ -186,7 +189,7 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const data = JSON.parse(e.target.result);
+        const data = JSON.parse(e.target?.result as string);
         if (data.currentDay) setCurrentDay(parseInt(data.currentDay));
         if (data.dailyProgress) setDailyProgress(data.dailyProgress);
         if (data.mistakes) setMistakes(data.mistakes);
