@@ -42,13 +42,37 @@ export default function App() {
   const [mistakeStatusFilter, setMistakeStatusFilter] = useState('Active');
 
   // Pomodoro Timer State
-  const [timeLeft, setTimeLeft] = useState(50 * 60);
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [timerMode, setTimerMode] = useState('focus'); // 'focus' or 'break'
-  const [focusBlocksCompleted, setFocusBlocksCompleted] = useState(() => parseInt(localStorage.getItem('focusBlocksCompleted')) || 0);
+  // Pomodoro Timer State
 
+const [timerMode, setTimerMode] = useState(() => {
+  return localStorage.getItem('timerMode') || 'focus';
+});
+
+const [timeLeft, setTimeLeft] = useState(() => {
+  const saved = localStorage.getItem('timeLeft');
+  return saved ? parseInt(saved) : 50 * 60;
+});
+
+const [isTimerRunning, setIsTimerRunning] = useState(() => {
+  return localStorage.getItem('isTimerRunning') === 'true';
+});
+
+const [timerEndTime, setTimerEndTime] = useState(() => {
+  const saved = localStorage.getItem('timerEndTime');
+  return saved ? parseInt(saved) : null;
+});
+
+const [focusBlocksCompleted, setFocusBlocksCompleted] = useState(() =>
+  parseInt(localStorage.getItem('focusBlocksCompleted')) || 0
+);
   // File Input Ref for Importing
   const fileInputRef = useRef(null);
+  // Notification permission
+useEffect(() => {
+  if ("Notification" in window) {
+    Notification.requestPermission();
+  }
+}, []);
 
   // Save to local storage whenever important state changes
   useEffect(() => {
@@ -58,31 +82,98 @@ export default function App() {
     localStorage.setItem('focusBlocksCompleted',String(focusBlocksCompleted));
   }, [currentDay, dailyProgress, mistakes, focusBlocksCompleted]);
 
-  // Timer countdown logic
-  useEffect(() => {
-    let interval = null;
-    if (isTimerRunning) {
-      interval = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            // Auto-switch modes when timer hits zero
-            setIsTimerRunning(false);
-            if (timerMode === 'focus') {
-              setFocusBlocksCompleted(c => c + 1);
-              setTimerMode('break');
-              return 10 * 60; // Set to 10 mins
-            } else {
-              setTimerMode('focus');
-              return 50 * 60; // Set to 50 mins
-            }
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isTimerRunning, timerMode]);
+  // Save timer data
+useEffect(() => {
+  localStorage.setItem('timeLeft', String(timeLeft));
+  localStorage.setItem('isTimerRunning', String(isTimerRunning));
+  localStorage.setItem('timerMode', timerMode);
 
+  if (timerEndTime) {
+    localStorage.setItem(
+      'timerEndTime',
+      String(timerEndTime)
+    );
+  }
+}, [
+  timeLeft,
+  isTimerRunning,
+  timerMode,
+  timerEndTime
+]);
+
+  // Timer countdown logic
+ // Timer countdown logic
+useEffect(() => {
+  let interval = null;
+
+  if (isTimerRunning && timerEndTime) {
+    interval = setInterval(() => {
+
+      const now = Date.now();
+
+      const remaining = Math.max(
+        0,
+        Math.floor((timerEndTime - now) / 1000)
+      );
+
+      setTimeLeft(remaining);
+
+      if (remaining <= 0) {
+
+        clearInterval(interval);
+
+        setIsTimerRunning(false);
+
+        // SOUND
+        const audio = new Audio('/alarm.mp3');
+
+        audio.play();
+
+        // NOTIFICATION
+        if (Notification.permission === "granted") {
+
+          new Notification(
+            timerMode === 'focus'
+              ? 'Focus Session Complete!'
+              : 'Break Time Over!',
+            {
+              body:
+                timerMode === 'focus'
+                  ? 'Take a break now.'
+                  : 'Start studying again.',
+            }
+          );
+        }
+
+        // AUTO SWITCH
+        if (timerMode === 'focus') {
+
+          setFocusBlocksCompleted(c => c + 1);
+
+          setTimerMode('break');
+
+          setTimeLeft(10 * 60);
+
+        } else {
+
+          setTimerMode('focus');
+
+          setTimeLeft(50 * 60);
+        }
+
+        localStorage.removeItem('timerEndTime');
+      }
+
+    }, 1000);
+  }
+
+  return () => clearInterval(interval);
+
+}, [
+  isTimerRunning,
+  timerEndTime,
+  timerMode
+]);
   const currentCycle = Math.ceil(currentDay / 11);
   const cycleDay = ((currentDay - 1) % 11) + 1;
   const todaySyllabus = SYLLABUS.find(s => s.day === cycleDay);
@@ -93,18 +184,54 @@ export default function App() {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const toggleTimer = () => setIsTimerRunning(!isTimerRunning);
-  
-  const resetTimer = () => {
-    setIsTimerRunning(false);
-    setTimeLeft(timerMode === 'focus' ? 50 * 60 : 10 * 60);
-  };
+const toggleTimer = () => {
 
-  const switchTimerMode = (mode) => {
-    setIsTimerRunning(false);
-    setTimerMode(mode);
-    setTimeLeft(mode === 'focus' ? 50 * 60 : 10 * 60);
-  };
+  if (!isTimerRunning) {
+
+    const endTime =
+      Date.now() + timeLeft * 1000;
+
+    setTimerEndTime(endTime);
+
+  } else {
+
+    localStorage.removeItem('timerEndTime');
+  }
+
+  setIsTimerRunning(!isTimerRunning);
+};  
+
+  const resetTimer = () => {
+
+  setIsTimerRunning(false);
+
+  localStorage.removeItem(
+    'timerEndTime'
+  );
+
+  setTimeLeft(
+    timerMode === 'focus'
+      ? 50 * 60
+      : 10 * 60
+  );
+};
+
+const switchTimerMode = (mode) => {
+
+  setIsTimerRunning(false);
+
+  localStorage.removeItem(
+    'timerEndTime'
+  );
+
+  setTimerMode(mode);
+
+  setTimeLeft(
+    mode === 'focus'
+      ? 50 * 60
+      : 10 * 60
+  );
+};
 
   const handleProgressChange = (subject, value) => {
     setDailyProgress(prev => ({
