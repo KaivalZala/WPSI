@@ -125,9 +125,16 @@ useEffect(() => {
         setIsTimerRunning(false);
 
         // SOUND
-        const audio = new Audio('/alarm.mp3');
+const audio = new Audio('/alarm.mp3');
 
-        audio.play();
+audio.loop = true;
+
+audio.play();
+
+setTimeout(() => {
+  audio.pause();
+  audio.currentTime = 0;
+}, 9000);
 
         // NOTIFICATION
         if (Notification.permission === "granted") {
